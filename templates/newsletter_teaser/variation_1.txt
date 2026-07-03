@@ -1,0 +1,8 @@
+Today's newsletter angle:
+
+{{title}}
+
+Short, practical, and worth checking before the offer changes. {{emoji}}
+
+{{cta}}
+

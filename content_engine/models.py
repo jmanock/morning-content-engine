@@ -91,3 +91,66 @@ class RankedDeal:
         payload["suggested_platform"] = self.suggested_platform
         return payload
 
+
+@dataclass(frozen=True)
+class BrandProfile:
+    slug: str
+    name: str
+    description: str
+    tone: str
+    emoji_style: str
+    hashtags: list[str]
+    social_platforms: list[str]
+    website: str
+    logo_path: str
+    affiliate_disclosure: str
+    posting_schedule: dict[str, Any]
+
+    @classmethod
+    def from_dict(cls, slug: str, data: dict[str, Any]) -> "BrandProfile":
+        return cls(
+            slug=slug,
+            name=str(data["name"]),
+            description=str(data.get("description", "")),
+            tone=str(data.get("tone", "Friendly and useful.")),
+            emoji_style=str(data.get("emoji_style", "light")),
+            hashtags=list(data.get("hashtags", [])),
+            social_platforms=list(data.get("social_platforms", [])),
+            website=str(data.get("website", "")),
+            logo_path=str(data.get("logo_path", "")),
+            affiliate_disclosure=str(data.get("affiliate_disclosure", "")),
+            posting_schedule=dict(data.get("posting_schedule", {})),
+        )
+
+
+@dataclass(frozen=True)
+class GeneratedPost:
+    date: str
+    brand: str
+    brand_slug: str
+    platform: str
+    content_type: str
+    content: str
+    hashtags: list[str]
+    score: int
+    score_reasons: list[str]
+    template_used: str
+    variables: dict[str, str]
+
+    def archive_key(self) -> str:
+        return self.content.strip().lower()
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "date": self.date,
+            "brand": self.brand,
+            "brand_slug": self.brand_slug,
+            "platform": self.platform,
+            "content_type": self.content_type,
+            "content": self.content,
+            "hashtags": self.hashtags,
+            "score": self.score,
+            "score_reasons": self.score_reasons,
+            "template_used": self.template_used,
+            "variables": self.variables,
+        }

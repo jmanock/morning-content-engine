@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 import shutil
+import json
 from datetime import date
 from pathlib import Path
 
+from content_engine.archive.store import ContentArchive
+from content_engine.config.brands import load_brands
+from content_engine.platform.pipeline import run_morning
 from content_engine.ranking.scorer import rank_deals, select_top_deals
 from content_engine.rendering.images import create_image_prompts, create_placeholder_images
 from content_engine.reports.writer import (
@@ -64,3 +68,48 @@ def clean(base_dir: Path | str = "output") -> None:
     if output_base.exists():
         shutil.rmtree(output_base)
     output_base.mkdir(parents=True, exist_ok=True)
+
+
+def morning(today: date | None = None) -> Path:
+    return run_morning(today=today)
+
+
+def brand_lines() -> list[str]:
+    return [
+        f"{brand.slug}: {brand.name} ({', '.join(brand.social_platforms)})"
+        for brand in load_brands()
+    ]
+
+
+def history_lines(limit: int = 20) -> list[str]:
+    rows = ContentArchive().history(limit=limit)
+    if not rows:
+        return ["No archived posts yet."]
+    return [
+        f"{row['date']} | {row['brand']} | {row['platform']} | {row['content_type']} | {row['score']}/100"
+        for row in rows
+    ]
+
+
+def latest_report_dir(base_dir: Path | str = "reports") -> Path | None:
+    reports_base = Path(base_dir)
+    if not reports_base.exists():
+        return None
+    dated_dirs = sorted([path for path in reports_base.iterdir() if path.is_dir()], reverse=True)
+    return dated_dirs[0] if dated_dirs else None
+
+
+def platform_report() -> Path:
+    current = latest_report_dir()
+    if current is None or not (current / "summary.md").exists():
+        current = morning()
+    return current / "summary.md"
+
+
+def stats_text() -> str:
+    current = latest_report_dir()
+    statistics_path = current / "statistics.json" if current else None
+    if statistics_path is None or not statistics_path.exists():
+        current = morning()
+        statistics_path = current / "statistics.json"
+    return json.dumps(json.loads(statistics_path.read_text(encoding="utf-8")), indent=2)

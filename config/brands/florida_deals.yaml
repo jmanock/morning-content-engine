@@ -1,0 +1,33 @@
+name: Florida Deals
+description: Daily Florida travel, local, hotel, flight, and cruise deals.
+tone: Friendly, helpful, practical, and lightly upbeat.
+emoji_style: light
+hashtags:
+  - "#FloridaDeals"
+  - "#TravelDeals"
+  - "#OrlandoDeals"
+  - "#CruiseDeals"
+  - "#HotelDeals"
+  - "#FlightDeals"
+social_platforms:
+  - instagram
+  - facebook
+  - twitter
+  - newsletter
+website: https://example.com/florida-deals
+logo_path: assets/logos/florida-deals.png
+affiliate_disclosure: Some links may be affiliate links. Prices can change quickly, so check the site before booking.
+posting_schedule:
+  morning:
+    content_types:
+      - deal_post
+      - tip_post
+      - weekend_roundup
+      - did_you_know
+      - question
+    platforms:
+      - instagram
+      - facebook
+      - twitter
+      - newsletter
+

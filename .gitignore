@@ -4,6 +4,7 @@ __pycache__/
 .venv/
 venv/
 output/
+reports/
+data/*.sqlite3
 *.pyc
 .DS_Store
-

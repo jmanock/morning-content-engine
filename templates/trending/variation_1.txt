@@ -1,0 +1,6 @@
+Trending this morning: {{title}}.
+
+The useful part is the value, not the noise. Check the terms and compare before making a decision. {{emoji}}
+
+{{hashtags}}
+

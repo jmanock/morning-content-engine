@@ -1,0 +1,8 @@
+{{emoji}} {{title}} is one of today's better finds.
+
+Price: {{price}}
+Savings: {{discount}}
+
+{{cta}}
+{{hashtags}}
+

@@ -1,0 +1,32 @@
+name: Offer Radar
+description: Smart money, credit card, cash back, and affiliate offer highlights.
+tone: Clear, trustworthy, plainspoken, and non-hype.
+emoji_style: minimal
+hashtags:
+  - "#MoneyDeals"
+  - "#CreditCardOffers"
+  - "#CashBack"
+  - "#FinanceDeals"
+  - "#SmartMoney"
+social_platforms:
+  - facebook
+  - linkedin
+  - twitter
+  - newsletter
+website: https://example.com/offer-radar
+logo_path: assets/logos/offer-radar.png
+affiliate_disclosure: Some offers may use affiliate links. Review terms and eligibility before applying.
+posting_schedule:
+  morning:
+    content_types:
+      - affiliate_highlight
+      - tip_post
+      - trending
+      - quote
+      - newsletter_teaser
+    platforms:
+      - facebook
+      - linkedin
+      - twitter
+      - newsletter
+

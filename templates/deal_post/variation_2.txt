@@ -1,0 +1,7 @@
+Spotted for {{brand}}: {{title}}.
+
+If {{city}} is on your radar, this is worth a quick look today. {{emoji}}
+
+{{cta}}
+{{hashtags}}
+

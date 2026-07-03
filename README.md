@@ -1,8 +1,8 @@
 # Morning Content Engine
 
-Private Python terminal app for generating a daily social media content package for deal websites.
+Private offline Python terminal app for generating daily social content packages across many deal brands.
 
-V1 is intentionally offline. It loads sample deal data, ranks the best offers, creates friendly Instagram and Facebook captions, writes a daily report, and renders simple placeholder images for manual review.
+V2 turns the original single-purpose deal script into a reusable content platform. Brands, platforms, schedules, hashtags, and templates are configuration driven, so adding a new website does not require code changes.
 
 ## Setup
 
@@ -14,55 +14,163 @@ pip install -r requirements.txt
 
 ## Commands
 
-Generate today's package:
+Run the V2 morning pipeline:
 
 ```bash
-python3 main.py generate
+python main.py morning
 ```
 
-Show the latest report path:
+List configured brands:
 
 ```bash
-python3 main.py report
+python main.py brands
 ```
 
-Preview top ranked deals:
+Show recent archived posts:
 
 ```bash
-python3 main.py top
+python main.py history
 ```
 
-Clear generated output:
+Show latest statistics:
 
 ```bash
-python3 main.py clean
+python main.py stats
 ```
 
-## Output
+Show the latest summary report:
 
-Generated files are written to:
+```bash
+python main.py report
+```
+
+The original V1 deal package commands still exist:
+
+```bash
+python main.py generate
+python main.py top
+python main.py clean
+```
+
+## Architecture
+
+```mermaid
+flowchart TD
+    A["Brand YAML files"] --> B["Brand loader"]
+    C["Sample deals"] --> D["Deal ranking"]
+    E["Text templates"] --> F["Template renderer"]
+    B --> G["Morning pipeline"]
+    D --> G
+    F --> G
+    G --> H["Quality scorer"]
+    H --> I["Markdown reports"]
+    H --> J["JSON statistics"]
+    H --> K["HTML preview"]
+    H --> L["SQLite archive"]
+    L --> G
+```
+
+## Brand Configs
+
+Brand files live in:
 
 ```text
-output/YYYY-MM-DD/
+config/brands/
 ```
 
-Each daily folder includes:
+Each `.yaml` file defines:
 
-- `daily_report.md`
-- `instagram_caption.txt`
-- `facebook_caption.txt`
-- `hashtags.txt`
-- `selected_deals.json`
-- `instagram_square.png`
-- `facebook_post.png`
-- `image_prompts.txt`
+- `name`
+- `description`
+- `tone`
+- `emoji_style`
+- `hashtags`
+- `social_platforms`
+- `website`
+- `logo_path`
+- `affiliate_disclosure`
+- `posting_schedule`
 
-## Roadmap
+The engine automatically loads every `.yaml` and `.yml` file in that folder.
 
-- Replace sample data with private deal feeds.
-- Add richer templates per website and category.
-- Add optional image generation provider support.
-- Add quality checks for expired or missing affiliate links.
-- Add manual approval workflow.
-- Later, explore posting integrations only after review workflows are solid.
+## Adding A New Website
+
+Create a new YAML file:
+
+```text
+config/brands/my_new_site.yaml
+```
+
+Use the existing files as examples. Set the brand name, website, hashtags, social platforms, and morning schedule. No Python changes are needed.
+
+## Templates
+
+Templates live in:
+
+```text
+templates/<content_type>/*.txt
+```
+
+Supported content types include:
+
+- `deal_post`
+- `tip_post`
+- `quote`
+- `question`
+- `did_you_know`
+- `weekend_roundup`
+- `trending`
+- `affiliate_highlight`
+- `newsletter_teaser`
+
+Templates use variables:
+
+```text
+{{title}}
+{{city}}
+{{price}}
+{{discount}}
+{{emoji}}
+{{cta}}
+{{hashtags}}
+{{brand}}
+```
+
+Add multiple `.txt` files inside a content type folder to create wording variations.
+
+## Reports
+
+The V2 morning pipeline writes reports to:
+
+```text
+reports/YYYY-MM-DD/
+```
+
+Generated files:
+
+- `instagram.md`
+- `facebook.md`
+- `linkedin.md`
+- `twitter.md`
+- `newsletter.md`
+- `summary.md`
+- `preview.html`
+- `statistics.json`
+- `posts.json`
+
+## Archive
+
+Every generated post is saved to SQLite:
+
+```text
+data/content_archive.sqlite3
+```
+
+The archive stores date, brand, platform, content, hashtags, score, template used, and content type. It is also used to avoid generating identical content twice.
+
+## Tests
+
+```bash
+python -m unittest discover
+```
 
