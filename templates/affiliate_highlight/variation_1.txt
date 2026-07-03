@@ -1,9 +1,9 @@
 Offer highlight: {{title}}.
 
-Potential value: {{discount}}
+{{summary}}
+Confidence: {{confidence}}
 
 This may include an affiliate link, so review the full terms before you apply or buy. {{emoji}}
 
 {{cta}}
 {{hashtags}}
-

@@ -1,8 +1,8 @@
 # Morning Content Engine
 
-Private offline Python terminal app for generating daily social content packages across many deal brands.
+Private offline Python terminal app for turning project signals into a daily reviewable content queue.
 
-V2 turns the original single-purpose deal script into a reusable content platform. Brands, platforms, schedules, hashtags, and templates are configuration driven, so adding a new website does not require code changes.
+V3 makes the engine signal-driven. Any project can drop JSON into `signals/inbox/`, and the app will validate the signals, store them in SQLite, rank them, create a daily publishing queue, generate platform copy, and write reports for manual review. It does not auto-post.
 
 ## Setup
 
@@ -14,39 +14,21 @@ pip install -r requirements.txt
 
 ## Commands
 
-Run the V2 morning pipeline:
-
 ```bash
+python main.py import-signals
+python main.py signals
+python main.py queue
 python main.py morning
+python main.py report
+python main.py stats
+python main.py preview
 ```
 
-List configured brands:
+Still supported:
 
 ```bash
 python main.py brands
-```
-
-Show recent archived posts:
-
-```bash
 python main.py history
-```
-
-Show latest statistics:
-
-```bash
-python main.py stats
-```
-
-Show the latest summary report:
-
-```bash
-python main.py report
-```
-
-The original V1 deal package commands still exist:
-
-```bash
 python main.py generate
 python main.py top
 python main.py clean
@@ -56,52 +38,127 @@ python main.py clean
 
 ```mermaid
 flowchart TD
-    A["Brand YAML files"] --> B["Brand loader"]
-    C["Sample deals"] --> D["Deal ranking"]
-    E["Text templates"] --> F["Template renderer"]
-    B --> G["Morning pipeline"]
-    D --> G
-    F --> G
-    G --> H["Quality scorer"]
-    H --> I["Markdown reports"]
-    H --> J["JSON statistics"]
-    H --> K["HTML preview"]
-    H --> L["SQLite archive"]
-    L --> G
+    A["External projects and manual JSON"] --> B["signals/inbox"]
+    B --> C["Signal importer"]
+    C --> D["SQLite signals table"]
+    D --> E["Signal ranking"]
+    E --> F["Daily content queue"]
+    G["Brand YAML configs"] --> F
+    H["Signal templates"] --> I["Content generator"]
+    F --> I
+    I --> J["Quality scorer"]
+    J --> K["SQLite post archive"]
+    J --> L["Platform markdown reports"]
+    J --> M["preview.html dashboard"]
+    F --> N["publishing_schedule.md"]
+    K --> E
 ```
 
-## Brand Configs
+## Signal Intake
 
-Brand files live in:
+Drop JSON files into:
 
 ```text
-config/brands/
+signals/inbox/
 ```
 
-Each `.yaml` file defines:
+Run:
 
-- `name`
+```bash
+python main.py import-signals
+```
+
+Valid files move to `signals/processed/`. Invalid files move to `signals/archive/errors/`.
+
+Example signal files live in:
+
+```text
+examples/signals/
+```
+
+## Signal Model
+
+Each signal includes:
+
+- `id`
+- `source_project`
+- `source_type`
+- `brand`
+- `title`
+- `summary`
 - `description`
-- `tone`
-- `emoji_style`
-- `hashtags`
-- `social_platforms`
-- `website`
-- `logo_path`
-- `affiliate_disclosure`
-- `posting_schedule`
+- `url`
+- `affiliate_url`
+- `category`
+- `tags`
+- `priority`
+- `confidence`
+- `expiration`
+- `image_prompt`
+- `metadata`
+- `created_at`
 
-The engine automatically loads every `.yaml` and `.yml` file in that folder.
+## Daily Queue
 
-## Adding A New Website
+Run:
 
-Create a new YAML file:
-
-```text
-config/brands/my_new_site.yaml
+```bash
+python main.py queue
 ```
 
-Use the existing files as examples. Set the brand name, website, hashtags, social platforms, and morning schedule. No Python changes are needed.
+The queue ranks recent signals by priority, confidence, expiration, brand fit, and duplicate history. It assigns signals to review platforms:
+
+- Instagram
+- Facebook
+- Newsletter
+- Blog
+- Twitter/X
+- LinkedIn
+
+Queue entries are stored in SQLite.
+
+## Morning Pipeline
+
+Run:
+
+```bash
+python main.py morning
+```
+
+Pipeline:
+
+1. Load brands.
+2. Load templates.
+3. Import pending inbox signals.
+4. Rank signals.
+5. Create the daily content queue.
+6. Generate platform content.
+7. Generate preview dashboard.
+8. Archive generated content.
+9. Generate statistics.
+
+## Reports
+
+Reports are written to:
+
+```text
+reports/YYYY-MM-DD/
+```
+
+Generated files include:
+
+- `instagram.md`
+- `facebook.md`
+- `linkedin.md`
+- `twitter.md`
+- `newsletter.md`
+- `blog.md`
+- `summary.md`
+- `publishing_schedule.md`
+- `preview.html`
+- `statistics.json`
+- `posts.json`
+- `queue.json`
 
 ## Templates
 
@@ -111,62 +168,45 @@ Templates live in:
 templates/<content_type>/*.txt
 ```
 
-Supported content types include:
-
-- `deal_post`
-- `tip_post`
-- `quote`
-- `question`
-- `did_you_know`
-- `weekend_roundup`
-- `trending`
-- `affiliate_highlight`
-- `newsletter_teaser`
-
-Templates use variables:
+Signal-aware variables:
 
 ```text
 {{title}}
-{{city}}
-{{price}}
-{{discount}}
-{{emoji}}
+{{summary}}
+{{description}}
+{{brand}}
+{{category}}
+{{url}}
+{{affiliate_url}}
+{{confidence}}
+{{priority}}
 {{cta}}
 {{hashtags}}
-{{brand}}
 ```
 
 Add multiple `.txt` files inside a content type folder to create wording variations.
 
-## Reports
+## Brand Configs
 
-The V2 morning pipeline writes reports to:
-
-```text
-reports/YYYY-MM-DD/
-```
-
-Generated files:
-
-- `instagram.md`
-- `facebook.md`
-- `linkedin.md`
-- `twitter.md`
-- `newsletter.md`
-- `summary.md`
-- `preview.html`
-- `statistics.json`
-- `posts.json`
-
-## Archive
-
-Every generated post is saved to SQLite:
+Brand files live in:
 
 ```text
-data/content_archive.sqlite3
+config/brands/
 ```
 
-The archive stores date, brand, platform, content, hashtags, score, template used, and content type. It is also used to avoid generating identical content twice.
+The engine automatically loads every `.yaml` and `.yml` file. Adding a new website requires a new brand config and no Python changes.
+
+## Duplicate Protection
+
+The archive tracks:
+
+- signal id
+- title
+- URL
+- generated content hash
+- date used
+
+Recently used signals are skipped or ranked lower so the daily queue does not repeat the same content.
 
 ## Tests
 

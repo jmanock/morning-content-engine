@@ -7,7 +7,8 @@ from pathlib import Path
 
 from content_engine.archive.store import ContentArchive
 from content_engine.config.brands import load_brands
-from content_engine.platform.pipeline import run_morning
+from content_engine.platform.pipeline import create_queue, run_morning
+from content_engine.signals.importer import import_signals_from_inbox
 from content_engine.ranking.scorer import rank_deals, select_top_deals
 from content_engine.rendering.images import create_image_prompts, create_placeholder_images
 from content_engine.reports.writer import (
@@ -113,3 +114,36 @@ def stats_text() -> str:
         current = morning()
         statistics_path = current / "statistics.json"
     return json.dumps(json.loads(statistics_path.read_text(encoding="utf-8")), indent=2)
+
+
+def import_signal_lines() -> list[str]:
+    return import_signals_from_inbox().lines()
+
+
+def signal_lines(limit: int = 20) -> list[str]:
+    signals = ContentArchive().recent_signals(limit=limit)
+    if not signals:
+        return ["No signals imported yet."]
+    return [
+        f"{signal.id} | {signal.brand} | {signal.source_type} | priority {signal.priority} | confidence {round(signal.confidence * 100)}% | {signal.title}"
+        for signal in signals
+    ]
+
+
+def queue_lines() -> list[str]:
+    queue, skipped = create_queue()
+    if not queue:
+        return [f"No queued content. Skipped duplicates: {skipped}."]
+    lines = [f"Queued items: {len(queue)}", f"Skipped duplicates: {skipped}"]
+    lines.extend(
+        f"{item.scheduled_time} | {item.platform} | {item.brand} | {item.rank_score}/100 | {item.signal.title}"
+        for item in queue
+    )
+    return lines
+
+
+def preview_path() -> Path:
+    current = latest_report_dir()
+    if current is None or not (current / "preview.html").exists():
+        current = morning()
+    return current / "preview.html"

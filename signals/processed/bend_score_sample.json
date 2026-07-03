@@ -1,0 +1,39 @@
+[
+  {
+    "id": "bs-opportunity-retail-20260703",
+    "source_project": "Bend Score",
+    "source_type": "business_opportunity",
+    "brand": "Bend Score",
+    "title": "Retail corridor shows improving local demand",
+    "summary": "A Bend Score signal found stronger activity around a local retail corridor.",
+    "description": "Recent movement suggests a potential opportunity for a deeper business location report.",
+    "url": "https://example.com/bend-score/retail-corridor-signal",
+    "affiliate_url": "",
+    "category": "business",
+    "tags": ["local business", "retail", "opportunity"],
+    "priority": 8,
+    "confidence": 0.84,
+    "expiration": "2026-07-20",
+    "image_prompt": "Downtown retail street with data overlay, professional local business analytics style",
+    "metadata": {"market": "Bend", "score_delta": 12}
+  },
+  {
+    "id": "bs-traffic-spike-20260703",
+    "source_project": "Bend Score",
+    "source_type": "traffic_spike",
+    "brand": "Bend Score",
+    "title": "Traffic spike around new service business cluster",
+    "summary": "A local traffic pattern changed enough to warrant review.",
+    "description": "The spike could support a future post about where demand is forming.",
+    "url": "https://example.com/bend-score/service-cluster-spike",
+    "affiliate_url": "",
+    "category": "business",
+    "tags": ["traffic", "service business", "market signal"],
+    "priority": 7,
+    "confidence": 0.8,
+    "expiration": "2026-07-18",
+    "image_prompt": "Map dashboard showing local traffic activity, restrained business intelligence look",
+    "metadata": {"signal_strength": "medium"}
+  }
+]
+

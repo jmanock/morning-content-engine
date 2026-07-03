@@ -1,0 +1,57 @@
+[
+  {
+    "id": "fd-flight-mco-bos-20260703",
+    "source_project": "Florida Deals",
+    "source_type": "flight_deal",
+    "brand": "Florida Deals",
+    "title": "Orlando to Boston roundtrip flights from $138",
+    "summary": "A strong nonstop flight deal from Orlando to Boston for late-summer travel.",
+    "description": "Roundtrip fares are pricing well below the usual range, with several weekend-friendly dates available.",
+    "url": "https://example.com/florida-deals/orlando-boston-138",
+    "affiliate_url": "https://example.com/go/florida-deals/orlando-boston-138",
+    "category": "flight",
+    "tags": ["flights", "orlando", "boston", "travel"],
+    "priority": 9,
+    "confidence": 0.91,
+    "expiration": "2026-07-06",
+    "image_prompt": "Orlando airport gate with Boston destination board, clean sunny travel deal style",
+    "metadata": {"price": 138, "original_price": 289}
+  },
+  {
+    "id": "fd-hotel-sarasota-20260703",
+    "source_project": "Florida Deals",
+    "source_type": "hotel_deal",
+    "brand": "Florida Deals",
+    "title": "Sarasota beach hotel drops to $129 per night",
+    "summary": "A useful beach hotel rate for a quick Gulf Coast getaway.",
+    "description": "The rate is strongest for weekday stays and includes several rooms near the beach.",
+    "url": "https://example.com/florida-deals/sarasota-hotel-129",
+    "affiliate_url": "https://example.com/go/florida-deals/sarasota-hotel-129",
+    "category": "hotel",
+    "tags": ["hotel", "sarasota", "beach", "weekend"],
+    "priority": 8,
+    "confidence": 0.87,
+    "expiration": "2026-07-08",
+    "image_prompt": "Sarasota beach hotel balcony in morning light, approachable social travel graphic",
+    "metadata": {"price": 129, "savings_percent": 42}
+  },
+  {
+    "id": "fd-local-tampa-event-20260703",
+    "source_project": "Florida Deals",
+    "source_type": "local_event",
+    "brand": "Florida Deals",
+    "title": "Tampa family museum weekend discount",
+    "summary": "A local family deal for an indoor weekend activity in Tampa.",
+    "description": "The offer is a practical pick for hot or rainy summer days.",
+    "url": "https://example.com/florida-deals/tampa-museum-weekend",
+    "affiliate_url": "",
+    "category": "local",
+    "tags": ["tampa", "family", "local", "weekend"],
+    "priority": 6,
+    "confidence": 0.79,
+    "expiration": "2026-07-05",
+    "image_prompt": "Family-friendly Tampa museum scene with bright educational displays",
+    "metadata": {"audience": "families"}
+  }
+]
+

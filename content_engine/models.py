@@ -154,3 +154,108 @@ class GeneratedPost:
             "template_used": self.template_used,
             "variables": self.variables,
         }
+
+
+@dataclass(frozen=True)
+class Signal:
+    id: str
+    source_project: str
+    source_type: str
+    brand: str
+    title: str
+    summary: str
+    description: str
+    url: str
+    affiliate_url: str
+    category: str
+    tags: list[str]
+    priority: int
+    confidence: float
+    expiration: str
+    image_prompt: str
+    metadata: dict[str, Any]
+    created_at: str
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "Signal":
+        required = [
+            "id",
+            "source_project",
+            "source_type",
+            "brand",
+            "title",
+            "summary",
+            "description",
+            "url",
+            "category",
+            "priority",
+            "confidence",
+        ]
+        missing = [field for field in required if field not in data or data[field] in (None, "")]
+        if missing:
+            raise ValueError(f"Missing required signal fields: {', '.join(missing)}")
+
+        return cls(
+            id=str(data["id"]),
+            source_project=str(data["source_project"]),
+            source_type=str(data["source_type"]),
+            brand=str(data["brand"]),
+            title=str(data["title"]),
+            summary=str(data["summary"]),
+            description=str(data["description"]),
+            url=str(data["url"]),
+            affiliate_url=str(data.get("affiliate_url", "")),
+            category=str(data["category"]),
+            tags=[str(tag) for tag in data.get("tags", [])],
+            priority=max(1, min(10, int(data["priority"]))),
+            confidence=max(0.0, min(1.0, float(data["confidence"]))),
+            expiration=str(data.get("expiration", "")),
+            image_prompt=str(data.get("image_prompt", "")),
+            metadata=dict(data.get("metadata", {})),
+            created_at=str(data.get("created_at", "")),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "source_project": self.source_project,
+            "source_type": self.source_type,
+            "brand": self.brand,
+            "title": self.title,
+            "summary": self.summary,
+            "description": self.description,
+            "url": self.url,
+            "affiliate_url": self.affiliate_url,
+            "category": self.category,
+            "tags": self.tags,
+            "priority": self.priority,
+            "confidence": self.confidence,
+            "expiration": self.expiration,
+            "image_prompt": self.image_prompt,
+            "metadata": self.metadata,
+            "created_at": self.created_at,
+        }
+
+
+@dataclass(frozen=True)
+class QueuedContent:
+    date: str
+    signal: Signal
+    brand: str
+    platform: str
+    content_type: str
+    rank_score: int
+    scheduled_time: str
+    duplicate_risk: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "date": self.date,
+            "signal": self.signal.to_dict(),
+            "brand": self.brand,
+            "platform": self.platform,
+            "content_type": self.content_type,
+            "rank_score": self.rank_score,
+            "scheduled_time": self.scheduled_time,
+            "duplicate_risk": self.duplicate_risk,
+        }

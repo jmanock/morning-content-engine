@@ -1,6 +1,7 @@
 Trending this morning: {{title}}.
 
-The useful part is the value, not the noise. Check the terms and compare before making a decision. {{emoji}}
+{{summary}}
+
+The useful part is the signal, not the noise. Check the details and compare before making a decision. {{emoji}}
 
 {{hashtags}}
-

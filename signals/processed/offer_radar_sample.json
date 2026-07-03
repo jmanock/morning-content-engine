@@ -1,0 +1,39 @@
+[
+  {
+    "id": "or-cashback-200-20260703",
+    "source_project": "Offer Radar",
+    "source_type": "credit_card_offer",
+    "brand": "Offer Radar",
+    "title": "$200 cash bonus card offer returns",
+    "summary": "A simple cash bonus offer is back after qualifying spend.",
+    "description": "This is a broad-appeal offer for readers who prefer cash back over complex travel points.",
+    "url": "https://example.com/offer-radar/cash-bonus-200",
+    "affiliate_url": "https://example.com/go/offer-radar/cash-bonus-200",
+    "category": "finance",
+    "tags": ["cash back", "credit cards", "bonus"],
+    "priority": 9,
+    "confidence": 0.9,
+    "expiration": "2026-07-15",
+    "image_prompt": "Clean cash back credit card flat lay with simple trustworthy finance design",
+    "metadata": {"bonus_value": 200, "annual_fee": 0}
+  },
+  {
+    "id": "or-transfer-bonus-20260703",
+    "source_project": "Offer Radar",
+    "source_type": "travel_points_offer",
+    "brand": "Offer Radar",
+    "title": "Limited-time travel points transfer bonus",
+    "summary": "A travel rewards transfer bonus could stretch points for summer trips.",
+    "description": "Best for readers who already understand points programs and can compare redemption values.",
+    "url": "https://example.com/offer-radar/transfer-bonus",
+    "affiliate_url": "",
+    "category": "finance",
+    "tags": ["points", "travel rewards", "limited time"],
+    "priority": 7,
+    "confidence": 0.76,
+    "expiration": "2026-07-10",
+    "image_prompt": "Passport, boarding pass, and rewards points graphic in clean editorial finance style",
+    "metadata": {"bonus_percent": 25}
+  }
+]
+

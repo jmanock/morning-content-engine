@@ -1,9 +1,9 @@
 Weekend watch list for {{brand}}:
 
 {{title}}
+{{summary}}
 
 If you are planning a quick getaway or local outing, today's list has a few practical options. {{emoji}}
 
 {{cta}}
 {{hashtags}}
-

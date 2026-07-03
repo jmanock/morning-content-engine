@@ -9,14 +9,16 @@ from pathlib import Path
 
 from content_engine.archive.store import ContentArchive
 from content_engine.config.brands import load_brands
-from content_engine.models import BrandProfile, GeneratedPost, RankedDeal
+from content_engine.models import BrandProfile, GeneratedPost, QueuedContent, RankedDeal, Signal
 from content_engine.quality.scorer import score_content
+from content_engine.queue.builder import build_daily_queue
 from content_engine.ranking.scorer import rank_deals
+from content_engine.signals.importer import import_signals_from_inbox
 from content_engine.sources.sample_loader import load_sample_deals
 from content_engine.templates.renderer import TemplateCatalog, render_template
 
 
-PLATFORMS = ["instagram", "facebook", "linkedin", "twitter", "newsletter"]
+PLATFORMS = ["instagram", "facebook", "linkedin", "twitter", "newsletter", "blog"]
 EMOJIS = {"none": "", "minimal": "*", "light": "*", "expressive": "*"}
 
 
@@ -24,19 +26,40 @@ def run_morning(today: date | None = None) -> Path:
     current_date = today or date.today()
     brands = load_brands()
     archive = ContentArchive()
-    posts = generate_posts(brands, current_date, archive)
+    import_summary = import_signals_from_inbox(archive=archive)
+    queue, skipped_duplicates = create_queue(current_date=current_date, archive=archive)
+    posts = generate_posts(brands, current_date, archive, queue=queue)
     archive.save_posts(posts)
-    return save_reports(posts, current_date, archive)
+    return save_reports(posts, current_date, archive, queue=queue, import_summary=import_summary, skipped_duplicates=skipped_duplicates)
+
+
+def create_queue(current_date: date | None = None, archive: ContentArchive | None = None) -> tuple[list[QueuedContent], int]:
+    current_date = current_date or date.today()
+    archive = archive or ContentArchive()
+    existing_queue = archive.queue_for_date(current_date.isoformat())
+    if existing_queue:
+        return existing_queue, 0
+    queue, skipped_duplicates = build_daily_queue(
+        archive.recent_signals(limit=100),
+        current_date,
+        duplicate_keys=archive.signal_duplicate_keys(),
+    )
+    archive.save_queue(queue)
+    return queue, skipped_duplicates
 
 
 def generate_posts(
     brands: list[BrandProfile],
     current_date: date,
     archive: ContentArchive | None = None,
+    queue: list[QueuedContent] | None = None,
 ) -> list[GeneratedPost]:
     archive = archive or ContentArchive()
     catalog = TemplateCatalog()
     existing = archive.existing_content_keys()
+    if queue is not None and queue:
+        return _generate_posts_from_queue(queue, brands, current_date, archive, catalog, existing)
+
     ranked_deals = rank_deals(load_sample_deals(), today=current_date)
     posts: list[GeneratedPost] = []
 
@@ -57,8 +80,16 @@ def generate_posts(
     return posts
 
 
-def save_reports(posts: list[GeneratedPost], current_date: date, archive: ContentArchive | None = None) -> Path:
+def save_reports(
+    posts: list[GeneratedPost],
+    current_date: date,
+    archive: ContentArchive | None = None,
+    queue: list[QueuedContent] | None = None,
+    import_summary: object | None = None,
+    skipped_duplicates: int = 0,
+) -> Path:
     archive = archive or ContentArchive()
+    queue = queue or archive.queue_for_date(current_date.isoformat())
     report_dir = Path("reports") / current_date.isoformat()
     report_dir.mkdir(parents=True, exist_ok=True)
 
@@ -69,12 +100,52 @@ def save_reports(posts: list[GeneratedPost], current_date: date, archive: Conten
             [post for post in posts if post.platform == platform],
         )
 
-    stats = _statistics(posts, archive)
+    stats = _statistics(posts, archive, queue, import_summary, skipped_duplicates)
     (report_dir / "summary.md").write_text(_summary_markdown(posts, stats, current_date), encoding="utf-8")
-    (report_dir / "preview.html").write_text(_preview_html(posts, stats, current_date), encoding="utf-8")
+    (report_dir / "preview.html").write_text(_preview_html(posts, stats, current_date, queue), encoding="utf-8")
+    (report_dir / "publishing_schedule.md").write_text(_publishing_schedule(queue), encoding="utf-8")
     (report_dir / "statistics.json").write_text(json.dumps(stats, indent=2), encoding="utf-8")
     (report_dir / "posts.json").write_text(json.dumps([post.to_dict() for post in posts], indent=2), encoding="utf-8")
+    (report_dir / "queue.json").write_text(json.dumps([item.to_dict() for item in queue], indent=2), encoding="utf-8")
     return report_dir
+
+
+def _generate_posts_from_queue(
+    queue: list[QueuedContent],
+    brands: list[BrandProfile],
+    current_date: date,
+    archive: ContentArchive,
+    catalog: TemplateCatalog,
+    existing: set[str],
+) -> list[GeneratedPost]:
+    brand_map = {brand.name: brand for brand in brands}
+    posts: list[GeneratedPost] = []
+    for item in queue:
+        brand = brand_map.get(item.brand) or _brand_from_signal(item.signal)
+        hashtags = _hashtags_for_platform(brand.hashtags, item.platform)
+        variables = _signal_variables_for(brand, item.signal, item.platform, hashtags)
+        template_path = catalog.choose(item.content_type, f"{item.date}:{item.signal.id}:{item.platform}")
+        content = render_template(template_path, variables)
+        all_existing = {*existing, *(post.archive_key() for post in posts)}
+        if content.strip().lower() in all_existing:
+            content = _make_unique_content(content, current_date, all_existing)
+        score, reasons = score_content(content, item.platform, hashtags, all_existing)
+        posts.append(
+            GeneratedPost(
+                date=current_date.isoformat(),
+                brand=brand.name,
+                brand_slug=brand.slug,
+                platform=item.platform,
+                content_type=item.content_type,
+                content=content,
+                hashtags=hashtags,
+                score=score,
+                score_reasons=reasons,
+                template_used=str(template_path),
+                variables=variables,
+            )
+        )
+    return posts
 
 
 def _generate_one_post(
@@ -176,6 +247,47 @@ def _variables_for(brand: BrandProfile, ranked_deal: RankedDeal, platform: str, 
     }
 
 
+def _signal_variables_for(brand: BrandProfile, signal: Signal, platform: str, hashtags: list[str]) -> dict[str, str]:
+    cta = "See the full list on the site" if platform in {"facebook", "linkedin", "newsletter", "blog"} else "Check today's update"
+    link = signal.affiliate_url or signal.url or brand.website
+    price = signal.metadata.get("price") or signal.metadata.get("bonus_value") or signal.metadata.get("value") or ""
+    discount = signal.metadata.get("savings_percent") or signal.metadata.get("bonus_percent") or ""
+    return {
+        "brand": brand.name,
+        "title": signal.title,
+        "summary": signal.summary,
+        "description": signal.description,
+        "category": signal.category,
+        "city": str(signal.metadata.get("market", "")),
+        "price": f"${price:,.0f}" if isinstance(price, int | float) else str(price),
+        "discount": f"{discount}% potential value" if isinstance(discount, int | float) else str(discount),
+        "url": signal.url,
+        "affiliate_url": signal.affiliate_url,
+        "confidence": f"{round(signal.confidence * 100)}%",
+        "priority": str(signal.priority),
+        "emoji": EMOJIS.get(brand.emoji_style, ""),
+        "cta": f"{cta}: {link}",
+        "hashtags": " ".join(hashtags),
+        "affiliate_disclosure": brand.affiliate_disclosure,
+    }
+
+
+def _brand_from_signal(signal: Signal) -> BrandProfile:
+    return BrandProfile(
+        slug=signal.brand.lower().replace(" ", "_").replace("/", "_"),
+        name=signal.brand,
+        description=f"Auto-created profile for {signal.brand}",
+        tone="Clear and helpful.",
+        emoji_style="minimal",
+        hashtags=[f"#{signal.brand.replace(' ', '')}", f"#{signal.category.title().replace(' ', '')}"],
+        social_platforms=["facebook", "newsletter", "blog", "twitter", "linkedin"],
+        website=signal.url,
+        logo_path="",
+        affiliate_disclosure="Review links and terms before publishing.",
+        posting_schedule={},
+    )
+
+
 def _hashtags_for_platform(tags: list[str], platform: str) -> list[str]:
     if platform == "newsletter":
         return tags[:3]
@@ -208,18 +320,36 @@ def _write_platform_report(path: Path, platform: str, posts: list[GeneratedPost]
     path.write_text("\n".join(lines), encoding="utf-8")
 
 
-def _statistics(posts: list[GeneratedPost], archive: ContentArchive) -> dict[str, object]:
+def _statistics(
+    posts: list[GeneratedPost],
+    archive: ContentArchive,
+    queue: list[QueuedContent],
+    import_summary: object | None,
+    skipped_duplicates: int,
+) -> dict[str, object]:
     by_platform = Counter(post.platform for post in posts)
     by_brand = Counter(post.brand for post in posts)
     scores = [post.score for post in posts]
+    confidences = [item.signal.confidence for item in queue]
+    signal_stats = archive.signal_stats()
+    imported = getattr(import_summary, "signals_saved", 0) if import_summary is not None else 0
     return {
+        "signals_imported": imported,
+        "signals_queued": len(queue),
         "generated_posts": len(posts),
+        "posts_generated": len(posts),
+        "brands_represented": len(by_brand),
+        "platforms_used": len(by_platform),
+        "average_confidence": round(sum(confidences) / max(len(confidences), 1), 3),
         "average_score": round(sum(scores) / max(len(scores), 1), 2),
+        "average_content_score": round(sum(scores) / max(len(scores), 1), 2),
         "min_score": min(scores) if scores else 0,
         "max_score": max(scores) if scores else 0,
+        "skipped_duplicates": skipped_duplicates,
         "by_platform": dict(by_platform),
         "by_brand": dict(by_brand),
         "archive": archive.stats(),
+        "signals": signal_stats,
     }
 
 
@@ -238,20 +368,48 @@ def _summary_markdown(posts: list[GeneratedPost], stats: dict[str, object], curr
     return "\n".join(lines) + "\n"
 
 
-def _preview_html(posts: list[GeneratedPost], stats: dict[str, object], current_date: date) -> str:
+def _preview_html(posts: list[GeneratedPost], stats: dict[str, object], current_date: date, queue: list[QueuedContent]) -> str:
     grouped: dict[str, list[GeneratedPost]] = defaultdict(list)
     for post in posts:
         grouped[post.platform].append(post)
+
+    queue_by_platform = {item.platform: item for item in queue}
+    signal_rows = []
+    for item in queue:
+        signal_rows.append(
+            f"""
+            <tr>
+              <td>{html.escape(item.scheduled_time)}</td>
+              <td>{html.escape(item.platform.title())}</td>
+              <td>{html.escape(item.brand)}</td>
+              <td>{html.escape(item.signal.source_project)}</td>
+              <td>{html.escape(item.signal.title)}</td>
+              <td>{round(item.signal.confidence * 100)}%</td>
+              <td>{item.rank_score}/100</td>
+              <td><a href="{html.escape(item.signal.url)}">link</a></td>
+            </tr>
+            """
+        )
 
     sections = []
     for platform, platform_posts in grouped.items():
         cards = []
         for post in platform_posts:
+            queue_item = queue_by_platform.get(post.platform)
+            signal_meta = ""
+            if queue_item is not None:
+                signal_meta = (
+                    f"<div class=\"detail\">Source: {html.escape(queue_item.signal.source_project)} | "
+                    f"Confidence: {round(queue_item.signal.confidence * 100)}% | "
+                    f"CTA: {html.escape(post.variables.get('cta', ''))}</div>"
+                )
             cards.append(
                 f"""
                 <article class="card">
                   <div class="meta">{html.escape(post.brand)} | {html.escape(post.content_type)} | {post.score}/100</div>
+                  {signal_meta}
                   <pre>{html.escape(post.content)}</pre>
+                  <div class="detail">Hashtags: {html.escape(' '.join(post.hashtags))}</div>
                   <div class="template">{html.escape(post.template_used)}</div>
                 </article>
                 """
@@ -269,14 +427,32 @@ def _preview_html(posts: list[GeneratedPost], stats: dict[str, object], current_
     .stats {{ margin: 16px 0 28px; color: #495057; }}
     .card {{ background: white; border: 1px solid #d8dee4; border-radius: 8px; padding: 18px; margin: 14px 0; }}
     .meta {{ font-weight: 700; color: #0969da; margin-bottom: 12px; }}
+    .detail {{ color: #495057; font-size: 13px; margin: 6px 0 12px; }}
     pre {{ white-space: pre-wrap; font-family: inherit; line-height: 1.45; }}
     .template {{ color: #6e7781; font-size: 12px; margin-top: 12px; }}
+    table {{ width: 100%; border-collapse: collapse; background: white; margin: 16px 0 28px; }}
+    th, td {{ border: 1px solid #d8dee4; padding: 8px; text-align: left; vertical-align: top; }}
+    th {{ background: #eef2f6; }}
   </style>
 </head>
 <body>
   <h1>Morning Content Preview</h1>
   <div class="stats">{current_date.isoformat()} | {stats["generated_posts"]} posts | average score {stats["average_score"]}</div>
+  <h2>Top Signals And Queue</h2>
+  <table>
+    <thead><tr><th>Time</th><th>Platform</th><th>Brand</th><th>Source</th><th>Signal</th><th>Confidence</th><th>Rank</th><th>Link</th></tr></thead>
+    <tbody>{''.join(signal_rows)}</tbody>
+  </table>
   {''.join(sections)}
 </body>
 </html>
 """
+
+
+def _publishing_schedule(queue: list[QueuedContent]) -> str:
+    lines = ["# Publishing Schedule", ""]
+    if not queue:
+        lines.append("No queued content for today.")
+    for item in queue:
+        lines.append(f"{item.scheduled_time} - {item.platform.title()} - {item.brand} - {item.signal.title}")
+    return "\n".join(lines) + "\n"

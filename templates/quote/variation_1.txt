@@ -1,6 +1,6 @@
 "A good deal is only good when it fits the plan."
 
+Today's context: {{summary}}
 Keeping today's finds practical, useful, and easy to compare. {{emoji}}
 
 {{hashtags}}
-

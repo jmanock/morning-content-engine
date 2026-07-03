@@ -1,7 +1,8 @@
 Spotted for {{brand}}: {{title}}.
 
-If {{city}} is on your radar, this is worth a quick look today. {{emoji}}
+{{summary}} {{emoji}}
+
+Priority: {{priority}}/10
 
 {{cta}}
 {{hashtags}}
-

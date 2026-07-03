@@ -1,6 +1,6 @@
 Before you jump on {{title}}, take a minute to check the expiration date and any fine print.
 
+Signal confidence: {{confidence}}
 Small checks save real money. {{emoji}}
 
 {{hashtags}}
-

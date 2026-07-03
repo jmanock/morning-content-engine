@@ -1,0 +1,30 @@
+name: Bend Score
+description: Local business opportunity signals, market movement, and location intelligence.
+tone: Analytical, concise, useful, and grounded.
+emoji_style: minimal
+hashtags:
+  - "#BendScore"
+  - "#LocalBusiness"
+  - "#BusinessOpportunity"
+  - "#MarketSignals"
+  - "#SmallBusiness"
+social_platforms:
+  - linkedin
+  - blog
+  - newsletter
+  - twitter
+website: https://example.com/bend-score
+logo_path: assets/logos/bend-score.png
+affiliate_disclosure: This is informational content for manual review, not financial or business advice.
+posting_schedule:
+  morning:
+    content_types:
+      - trending
+      - did_you_know
+      - newsletter_teaser
+    platforms:
+      - linkedin
+      - blog
+      - newsletter
+      - twitter
+

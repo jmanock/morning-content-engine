@@ -1,0 +1,2 @@
+"""Signal intake and validation."""
+
