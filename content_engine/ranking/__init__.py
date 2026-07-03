@@ -1,0 +1,2 @@
+"""Deal ranking utilities."""
+
