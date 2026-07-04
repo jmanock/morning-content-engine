@@ -11,7 +11,8 @@ from content_engine.archive.store import ContentArchive
 from content_engine.config.brands import load_brands
 from content_engine.models import BrandProfile, GeneratedPost, QueuedContent, RankedDeal, Signal
 from content_engine.quality.scorer import score_content
-from content_engine.queue.builder import build_daily_queue
+from content_engine.config.queue import load_queue_config
+from content_engine.queue.builder import QueueBuildStats, build_daily_queue
 from content_engine.ranking.scorer import rank_deals
 from content_engine.signals.importer import import_signals_from_inbox
 from content_engine.sources.sample_loader import load_sample_deals
@@ -27,25 +28,40 @@ def run_morning(today: date | None = None) -> Path:
     brands = load_brands()
     archive = ContentArchive()
     import_summary = import_signals_from_inbox(archive=archive)
-    queue, skipped_duplicates = create_queue(current_date=current_date, archive=archive)
+    queue, queue_stats = create_queue(current_date=current_date, archive=archive, rebuild=True, return_stats=True)
     posts = generate_posts(brands, current_date, archive, queue=queue)
     archive.save_posts(posts)
-    return save_reports(posts, current_date, archive, queue=queue, import_summary=import_summary, skipped_duplicates=skipped_duplicates)
+    return save_reports(posts, current_date, archive, queue=queue, import_summary=import_summary, queue_stats=queue_stats)
 
 
-def create_queue(current_date: date | None = None, archive: ContentArchive | None = None) -> tuple[list[QueuedContent], int]:
+def create_queue(
+    current_date: date | None = None,
+    archive: ContentArchive | None = None,
+    limit: int | None = None,
+    brand_filter: str | None = None,
+    source_filter: str | None = None,
+    rebuild: bool = False,
+    return_stats: bool = False,
+) -> tuple[list[QueuedContent], int] | tuple[list[QueuedContent], QueueBuildStats]:
     current_date = current_date or date.today()
     archive = archive or ContentArchive()
-    existing_queue = archive.queue_for_date(current_date.isoformat())
-    if existing_queue:
+    existing_queue = archive.queue_for_date(current_date.isoformat()) if not rebuild and not any([limit, brand_filter, source_filter]) else []
+    if existing_queue and not return_stats:
         return existing_queue, 0
-    queue, skipped_duplicates = build_daily_queue(
+    config = load_queue_config()
+    queue, stats = build_daily_queue(
         archive.recent_signals(limit=100),
         current_date,
-        duplicate_keys=archive.signal_duplicate_keys(),
+        duplicate_keys=archive.signal_duplicate_keys(exclude_date=current_date.isoformat() if rebuild else None),
+        max_items=limit,
+        brand_filter=brand_filter,
+        source_filter=source_filter,
+        config=config,
+        return_stats=True,
     )
-    archive.save_queue(queue)
-    return queue, skipped_duplicates
+    if not any([limit, brand_filter, source_filter]):
+        archive.replace_queue_for_date(current_date.isoformat(), queue)
+    return (queue, stats) if return_stats else (queue, stats.skipped_duplicates)
 
 
 def generate_posts(
@@ -87,6 +103,7 @@ def save_reports(
     queue: list[QueuedContent] | None = None,
     import_summary: object | None = None,
     skipped_duplicates: int = 0,
+    queue_stats: QueueBuildStats | None = None,
 ) -> Path:
     archive = archive or ContentArchive()
     queue = queue or archive.queue_for_date(current_date.isoformat())
@@ -100,7 +117,7 @@ def save_reports(
             [post for post in posts if post.platform == platform],
         )
 
-    stats = _statistics(posts, archive, queue, import_summary, skipped_duplicates)
+    stats = _statistics(posts, archive, queue, import_summary, skipped_duplicates, queue_stats)
     (report_dir / "summary.md").write_text(_summary_markdown(posts, stats, current_date, queue), encoding="utf-8")
     (report_dir / "preview.html").write_text(_preview_html(posts, stats, current_date, queue), encoding="utf-8")
     (report_dir / "publishing_schedule.md").write_text(_publishing_schedule(queue), encoding="utf-8")
@@ -327,6 +344,7 @@ def _statistics(
     queue: list[QueuedContent],
     import_summary: object | None,
     skipped_duplicates: int,
+    queue_stats: QueueBuildStats | None = None,
 ) -> dict[str, object]:
     by_platform = Counter(post.platform for post in posts)
     by_brand = Counter(post.brand for post in posts)
@@ -338,13 +356,25 @@ def _statistics(
     import_errors = getattr(import_summary, "files_failed", 0) if import_summary is not None else 0
     import_duplicates = getattr(import_summary, "duplicates", 0) if import_summary is not None else 0
     import_sources = getattr(import_summary, "sources_used", []) if import_summary is not None else []
+    queue_stat_data = queue_stats.to_dict() if queue_stats else {
+        "total_signals_considered": len(queue),
+        "total_queued": len(queue),
+        "skipped_duplicates": skipped_duplicates,
+        "skipped_low_confidence": 0,
+        "skipped_low_priority": 0,
+        "skipped_platform_limits": 0,
+        "skipped_brand_limits": 0,
+        "skipped_source_limits": 0,
+    }
     return {
         "signals_imported": imported,
+        "total_signals_imported": signal_stats.get("total_signals", 0),
         "signals_import_processed_files": import_processed,
         "signal_import_errors": import_errors,
         "signal_import_duplicates": import_duplicates,
         "signal_sources_used": import_sources,
         "signals_queued": len(queue),
+        **queue_stat_data,
         "generated_posts": len(posts),
         "posts_generated": len(posts),
         "brands_represented": len(by_brand),
@@ -354,7 +384,7 @@ def _statistics(
         "average_content_score": round(sum(scores) / max(len(scores), 1), 2),
         "min_score": min(scores) if scores else 0,
         "max_score": max(scores) if scores else 0,
-        "skipped_duplicates": skipped_duplicates,
+        "skipped_duplicates": queue_stat_data["skipped_duplicates"],
         "by_platform": dict(by_platform),
         "by_brand": dict(by_brand),
         "archive": archive.stats(),
@@ -369,10 +399,21 @@ def _summary_markdown(posts: list[GeneratedPost], stats: dict[str, object], curr
         "## Signal Intake Summary",
         "",
         f"- Imported: {stats['signals_imported']}",
+        f"- Total signals imported: {stats['total_signals_imported']}",
         f"- Duplicates: {stats['signal_import_duplicates']}",
         f"- Errors: {stats['signal_import_errors']}",
         f"- Processed files: {stats['signals_import_processed_files']}",
         f"- Sources used: {', '.join(stats['signal_sources_used']) if stats['signal_sources_used'] else 'none'}",
+        "",
+        "## Queue Filter Summary",
+        "",
+        f"- Total signals considered: {stats['total_signals_considered']}",
+        f"- Total queued: {stats['total_queued']}",
+        f"- Skipped due to duplicate: {stats['skipped_duplicates']}",
+        f"- Skipped due to low confidence: {stats['skipped_low_confidence']}",
+        f"- Skipped due to low priority: {stats['skipped_low_priority']}",
+        f"- Skipped due to platform limits: {stats['skipped_platform_limits']}",
+        f"- Skipped due to brand limits: {stats['skipped_brand_limits']}",
         "",
         "## Queued Content Summary",
         "",
@@ -412,8 +453,14 @@ def _preview_html(posts: list[GeneratedPost], stats: dict[str, object], current_
         grouped[post.platform].append(post)
 
     queue_by_signal = {item.signal.id: item for item in queue}
+    post_score_by_signal = {
+        post.variables.get("signal_id", ""): post.score
+        for post in posts
+        if post.variables.get("signal_id")
+    }
     signal_rows = []
     for item in queue:
+        content_score = post_score_by_signal.get(item.signal.id, "n/a")
         signal_rows.append(
             f"""
             <tr>
@@ -421,9 +468,12 @@ def _preview_html(posts: list[GeneratedPost], stats: dict[str, object], current_
               <td>{html.escape(item.platform.title())}</td>
               <td>{html.escape(item.brand)}</td>
               <td>{html.escape(item.signal.source_project)}</td>
+              <td>{html.escape(item.signal.category)}</td>
               <td>{html.escape(item.signal.title)}</td>
               <td>{round(item.signal.confidence * 100)}%</td>
+              <td>{item.signal.priority}/10</td>
               <td>{item.rank_score}/100</td>
+              <td>{content_score if content_score == 'n/a' else str(content_score) + '/100'}</td>
               <td>{html.escape(item.reason)}</td>
               <td><a href="{html.escape(item.signal.url)}">link</a></td>
             </tr>
@@ -480,7 +530,7 @@ def _preview_html(posts: list[GeneratedPost], stats: dict[str, object], current_
   <div class="stats">{current_date.isoformat()} | {stats["generated_posts"]} posts | average score {stats["average_score"]}</div>
   <h2>Top Signals And Queue</h2>
   <table>
-    <thead><tr><th>Time</th><th>Platform</th><th>Brand</th><th>Source</th><th>Signal</th><th>Confidence</th><th>Rank</th><th>Reason</th><th>Link</th></tr></thead>
+    <thead><tr><th>Time</th><th>Platform</th><th>Brand</th><th>Source</th><th>Category</th><th>Signal</th><th>Confidence</th><th>Priority</th><th>Rank</th><th>Content Score</th><th>Reason</th><th>Link</th></tr></thead>
     <tbody>{''.join(signal_rows)}</tbody>
   </table>
   {''.join(sections)}

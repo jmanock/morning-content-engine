@@ -1,0 +1,11 @@
+Market signal from {{brand}}:
+
+{{title}}
+
+{{summary}}
+
+Confidence: {{confidence}}. This belongs in the research queue before it becomes a content claim.
+
+{{cta}}
+{{hashtags}}
+

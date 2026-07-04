@@ -6,5 +6,9 @@ venv/
 output/
 reports/
 data/*.sqlite3
+signals/inbox/*.json
+signals/processed/*.json
+signals/archive/errors/*.json
+signals/archive/duplicates/*.json
 *.pyc
 .DS_Store

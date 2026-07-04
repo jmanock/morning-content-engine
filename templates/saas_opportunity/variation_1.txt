@@ -1,0 +1,11 @@
+Bend Score spotted a SaaS opportunity with possible automation upside.
+
+{{title}}
+
+{{summary}}
+
+Confidence: {{confidence}}. Priority: {{priority}}/10.
+
+{{cta}}
+{{hashtags}}
+

@@ -144,11 +144,24 @@ def signal_lines(
     ]
 
 
-def queue_lines() -> list[str]:
-    queue, skipped = create_queue()
+def queue_lines(limit: int | None = None, brand_filter: str | None = None, source_filter: str | None = None) -> list[str]:
+    queue, stats = create_queue(
+        limit=limit,
+        brand_filter=brand_filter,
+        source_filter=source_filter,
+        rebuild=bool(limit or brand_filter or source_filter),
+        return_stats=True,
+    )
     if not queue:
-        return [f"No queued content. Skipped duplicates: {skipped}."]
-    lines = [f"Queued items: {len(queue)}", f"Skipped duplicates: {skipped}"]
+        return [f"No queued content. Skipped duplicates: {stats.skipped_duplicates}."]
+    lines = [
+        f"Queued items: {len(queue)}",
+        f"Signals considered: {stats.total_signals_considered}",
+        f"Skipped duplicates: {stats.skipped_duplicates}",
+        f"Skipped low confidence: {stats.skipped_low_confidence}",
+        f"Skipped platform limits: {stats.skipped_platform_limits}",
+        f"Skipped brand limits: {stats.skipped_brand_limits}",
+    ]
     lines.extend(
         f"{item.scheduled_time} | {item.platform} | {item.brand} | {item.rank_score}/100 | {item.signal.title} | {item.reason}"
         for item in queue

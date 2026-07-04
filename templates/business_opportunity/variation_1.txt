@@ -1,0 +1,9 @@
+Bend Score found a business worth researching: {{title}}.
+
+{{summary}}
+
+Signal strength: {{confidence}} confidence, priority {{priority}}/10.
+
+{{cta}}
+{{hashtags}}
+

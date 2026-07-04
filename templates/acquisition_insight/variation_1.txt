@@ -1,0 +1,11 @@
+Acquisition insight from {{brand}}:
+
+{{title}}
+
+{{summary}}
+
+The next step is diligence, not hype. Review the numbers, source, and upside before acting.
+
+{{cta}}
+{{hashtags}}
+

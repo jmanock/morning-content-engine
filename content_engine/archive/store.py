@@ -231,16 +231,19 @@ class ContentArchive:
             ).fetchall()
         return [self._signal_from_row(row) for row in rows]
 
-    def signal_duplicate_keys(self, days: int = 14) -> set[str]:
+    def signal_duplicate_keys(self, days: int = 14, exclude_date: str | None = None) -> set[str]:
         with self._connection() as conn:
+            exclude_sql = "AND q.date != ?" if exclude_date else ""
+            params: tuple[object, ...] = (f"-{days} days", exclude_date) if exclude_date else (f"-{days} days",)
             rows = conn.execute(
-                """
+                f"""
                 SELECT DISTINCT q.signal_id, lower(s.title), lower(s.url)
                 FROM content_queue q
                 JOIN signals s ON s.id = q.signal_id
                 WHERE q.date >= date('now', ?)
+                {exclude_sql}
                 """,
-                (f"-{days} days",),
+                params,
             ).fetchall()
             content_rows = conn.execute(
                 """
@@ -279,6 +282,11 @@ class ContentArchive:
                 )
                 saved += cursor.rowcount
         return saved
+
+    def replace_queue_for_date(self, queue_date: str, queue: list[QueuedContent]) -> int:
+        with self._connection() as conn:
+            conn.execute("DELETE FROM content_queue WHERE date = ?", (queue_date,))
+        return self.save_queue(queue)
 
     def queue_for_date(self, queue_date: str) -> list[QueuedContent]:
         with self._connection() as conn:

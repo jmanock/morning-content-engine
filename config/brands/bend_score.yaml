@@ -19,6 +19,11 @@ affiliate_disclosure: This is informational content for manual review, not finan
 posting_schedule:
   morning:
     content_types:
+      - business_opportunity
+      - acquisition_insight
+      - saas_opportunity
+      - github_opportunity
+      - market_signal
       - trending
       - did_you_know
       - newsletter_teaser
@@ -27,4 +32,3 @@ posting_schedule:
       - blog
       - newsletter
       - twitter
-

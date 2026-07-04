@@ -22,6 +22,9 @@ python main.py signals florida-deals
 python main.py signals --today
 python main.py signals --high-priority
 python main.py queue
+python main.py queue --limit 10
+python main.py queue --brand "Bend Score"
+python main.py queue --source bend-score
 python main.py morning
 python main.py report
 python main.py stats
@@ -174,7 +177,13 @@ Run:
 python main.py queue
 ```
 
-The queue ranks recent signals by priority, confidence, expiration, brand schedule fit, platform fit, and recent duplicate history. Each queued item includes a reason explaining why it was selected. It assigns signals to review platforms:
+Queue behavior is configured in:
+
+```text
+config/queue.yaml
+```
+
+The queue ranks recent signals by priority, confidence, expiration, brand schedule fit, platform fit, source/category diversity, and recent duplicate history. Each queued item includes a reason explaining why it was selected. It assigns signals to review platforms:
 
 - Instagram
 - Facebook
@@ -184,6 +193,14 @@ The queue ranks recent signals by priority, confidence, expiration, brand schedu
 - LinkedIn
 
 Queue entries are stored in SQLite.
+
+Useful queue previews:
+
+```bash
+python main.py queue --limit 10
+python main.py queue --brand "Bend Score"
+python main.py queue --source bend-score
+```
 
 ## Morning Pipeline
 

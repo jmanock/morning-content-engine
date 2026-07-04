@@ -29,7 +29,10 @@ def build_parser() -> argparse.ArgumentParser:
     signals_parser.add_argument("filter", nargs="?", help="Optional brand/source filter, such as florida-deals")
     signals_parser.add_argument("--today", action="store_true", help="Only show signals imported today")
     signals_parser.add_argument("--high-priority", action="store_true", help="Only show priority 8+ signals")
-    subparsers.add_parser("queue", help="Create or show today's signal-driven content queue")
+    queue_parser = subparsers.add_parser("queue", help="Create or show today's signal-driven content queue")
+    queue_parser.add_argument("--limit", type=int, help="Maximum queued posts to preview")
+    queue_parser.add_argument("--brand", help="Only queue signals for a brand, such as Bend Score")
+    queue_parser.add_argument("--source", help="Only queue signals for a source project, such as bend-score")
     subparsers.add_parser("brands", help="List configured brands")
     subparsers.add_parser("history", help="Show recent archived generated posts")
     subparsers.add_parser("stats", help="Print latest content statistics")
@@ -58,7 +61,7 @@ def main() -> None:
         for line in signal_lines(args.filter, args.today, args.high_priority):
             print(line)
     elif args.command == "queue":
-        for line in queue_lines():
+        for line in queue_lines(args.limit, args.brand, args.source):
             print(line)
     elif args.command == "brands":
         for line in brand_lines():

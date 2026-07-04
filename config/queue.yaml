@@ -1,0 +1,8 @@
+max_posts_per_day: 10
+max_posts_per_brand: 4
+max_posts_per_platform: 4
+min_confidence: 60
+min_priority: 5
+allow_multiple_same_brand: true
+allow_multiple_same_source_project: true
+
