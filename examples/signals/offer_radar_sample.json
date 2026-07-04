@@ -12,7 +12,7 @@
     "category": "finance",
     "tags": ["cash back", "credit cards", "bonus"],
     "priority": 9,
-    "confidence": 0.9,
+    "confidence": 90,
     "expiration": "2026-07-15",
     "image_prompt": "Clean cash back credit card flat lay with simple trustworthy finance design",
     "metadata": {"bonus_value": 200, "annual_fee": 0}
@@ -30,7 +30,7 @@
     "category": "finance",
     "tags": ["points", "travel rewards", "limited time"],
     "priority": 7,
-    "confidence": 0.76,
+    "confidence": 76,
     "expiration": "2026-07-10",
     "image_prompt": "Passport, boarding pass, and rewards points graphic in clean editorial finance style",
     "metadata": {"bonus_percent": 25}

@@ -101,7 +101,7 @@ def save_reports(
         )
 
     stats = _statistics(posts, archive, queue, import_summary, skipped_duplicates)
-    (report_dir / "summary.md").write_text(_summary_markdown(posts, stats, current_date), encoding="utf-8")
+    (report_dir / "summary.md").write_text(_summary_markdown(posts, stats, current_date, queue), encoding="utf-8")
     (report_dir / "preview.html").write_text(_preview_html(posts, stats, current_date, queue), encoding="utf-8")
     (report_dir / "publishing_schedule.md").write_text(_publishing_schedule(queue), encoding="utf-8")
     (report_dir / "statistics.json").write_text(json.dumps(stats, indent=2), encoding="utf-8")
@@ -254,6 +254,7 @@ def _signal_variables_for(brand: BrandProfile, signal: Signal, platform: str, ha
     discount = signal.metadata.get("savings_percent") or signal.metadata.get("bonus_percent") or ""
     return {
         "brand": brand.name,
+        "signal_id": signal.id,
         "title": signal.title,
         "summary": signal.summary,
         "description": signal.description,
@@ -333,8 +334,16 @@ def _statistics(
     confidences = [item.signal.confidence for item in queue]
     signal_stats = archive.signal_stats()
     imported = getattr(import_summary, "signals_saved", 0) if import_summary is not None else 0
+    import_processed = getattr(import_summary, "files_processed", 0) if import_summary is not None else 0
+    import_errors = getattr(import_summary, "files_failed", 0) if import_summary is not None else 0
+    import_duplicates = getattr(import_summary, "duplicates", 0) if import_summary is not None else 0
+    import_sources = getattr(import_summary, "sources_used", []) if import_summary is not None else []
     return {
         "signals_imported": imported,
+        "signals_import_processed_files": import_processed,
+        "signal_import_errors": import_errors,
+        "signal_import_duplicates": import_duplicates,
+        "signal_sources_used": import_sources,
         "signals_queued": len(queue),
         "generated_posts": len(posts),
         "posts_generated": len(posts),
@@ -353,16 +362,45 @@ def _statistics(
     }
 
 
-def _summary_markdown(posts: list[GeneratedPost], stats: dict[str, object], current_date: date) -> str:
+def _summary_markdown(posts: list[GeneratedPost], stats: dict[str, object], current_date: date, queue: list[QueuedContent]) -> str:
     lines = [
         f"# Morning Content Summary - {current_date.isoformat()}",
         "",
+        "## Signal Intake Summary",
+        "",
+        f"- Imported: {stats['signals_imported']}",
+        f"- Duplicates: {stats['signal_import_duplicates']}",
+        f"- Errors: {stats['signal_import_errors']}",
+        f"- Processed files: {stats['signals_import_processed_files']}",
+        f"- Sources used: {', '.join(stats['signal_sources_used']) if stats['signal_sources_used'] else 'none'}",
+        "",
+        "## Queued Content Summary",
+        "",
+    ]
+    if not queue:
+        lines.append("- No queued signals.")
+    for item in queue:
+        lines.append(
+            f"- {item.scheduled_time} / {item.platform.title()} / {item.brand}: {item.signal.title} "
+            f"({item.signal.source_project}, {item.signal.source_type}, confidence {round(item.signal.confidence * 100)}%, "
+            f"priority {item.signal.priority}) - {item.reason}"
+        )
+    lines.extend(
+        [
+            "",
+            "## Post Summary",
+            "",
+        ]
+    )
+    lines.extend(
+        [
         f"Generated posts: {stats['generated_posts']}",
         f"Average quality score: {stats['average_score']}",
         "",
         "## Posts",
         "",
-    ]
+        ]
+    )
     for post in posts:
         lines.append(f"- {post.brand} / {post.platform}: {post.content_type} ({post.score}/100)")
     return "\n".join(lines) + "\n"
@@ -373,7 +411,7 @@ def _preview_html(posts: list[GeneratedPost], stats: dict[str, object], current_
     for post in posts:
         grouped[post.platform].append(post)
 
-    queue_by_platform = {item.platform: item for item in queue}
+    queue_by_signal = {item.signal.id: item for item in queue}
     signal_rows = []
     for item in queue:
         signal_rows.append(
@@ -386,6 +424,7 @@ def _preview_html(posts: list[GeneratedPost], stats: dict[str, object], current_
               <td>{html.escape(item.signal.title)}</td>
               <td>{round(item.signal.confidence * 100)}%</td>
               <td>{item.rank_score}/100</td>
+              <td>{html.escape(item.reason)}</td>
               <td><a href="{html.escape(item.signal.url)}">link</a></td>
             </tr>
             """
@@ -395,12 +434,13 @@ def _preview_html(posts: list[GeneratedPost], stats: dict[str, object], current_
     for platform, platform_posts in grouped.items():
         cards = []
         for post in platform_posts:
-            queue_item = queue_by_platform.get(post.platform)
+            queue_item = queue_by_signal.get(post.variables.get("signal_id", ""))
             signal_meta = ""
             if queue_item is not None:
                 signal_meta = (
                     f"<div class=\"detail\">Source: {html.escape(queue_item.signal.source_project)} | "
                     f"Confidence: {round(queue_item.signal.confidence * 100)}% | "
+                    f"Reason: {html.escape(queue_item.reason)} | "
                     f"CTA: {html.escape(post.variables.get('cta', ''))}</div>"
                 )
             cards.append(
@@ -440,7 +480,7 @@ def _preview_html(posts: list[GeneratedPost], stats: dict[str, object], current_
   <div class="stats">{current_date.isoformat()} | {stats["generated_posts"]} posts | average score {stats["average_score"]}</div>
   <h2>Top Signals And Queue</h2>
   <table>
-    <thead><tr><th>Time</th><th>Platform</th><th>Brand</th><th>Source</th><th>Signal</th><th>Confidence</th><th>Rank</th><th>Link</th></tr></thead>
+    <thead><tr><th>Time</th><th>Platform</th><th>Brand</th><th>Source</th><th>Signal</th><th>Confidence</th><th>Rank</th><th>Reason</th><th>Link</th></tr></thead>
     <tbody>{''.join(signal_rows)}</tbody>
   </table>
   {''.join(sections)}
@@ -454,5 +494,5 @@ def _publishing_schedule(queue: list[QueuedContent]) -> str:
     if not queue:
         lines.append("No queued content for today.")
     for item in queue:
-        lines.append(f"{item.scheduled_time} - {item.platform.title()} - {item.brand} - {item.signal.title}")
+        lines.append(f"{item.scheduled_time} - {item.platform.title()} - {item.brand} - {item.signal.title} ({item.reason})")
     return "\n".join(lines) + "\n"

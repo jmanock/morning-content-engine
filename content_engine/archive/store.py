@@ -87,11 +87,18 @@ class ContentArchive:
                     rank_score INTEGER NOT NULL,
                     scheduled_time TEXT NOT NULL,
                     duplicate_risk TEXT NOT NULL,
+                    reason TEXT NOT NULL DEFAULT '',
                     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                     UNIQUE(date, signal_id, platform)
                 )
                 """
             )
+            self._ensure_column(conn, "content_queue", "reason", "TEXT NOT NULL DEFAULT ''")
+
+    def _ensure_column(self, conn: sqlite3.Connection, table: str, column: str, definition: str) -> None:
+        columns = {row[1] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+        if column not in columns:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
 
     def existing_content_keys(self) -> set[str]:
         with self._connection() as conn:
@@ -187,17 +194,40 @@ class ContentArchive:
                 saved += cursor.rowcount
         return saved
 
-    def recent_signals(self, limit: int = 50) -> list[Signal]:
+    def existing_signal_ids(self) -> set[str]:
+        with self._connection() as conn:
+            rows = conn.execute("SELECT id FROM signals").fetchall()
+        return {row[0] for row in rows}
+
+    def recent_signals(
+        self,
+        limit: int = 50,
+        brand_filter: str | None = None,
+        today_only: bool = False,
+        high_priority: bool = False,
+    ) -> list[Signal]:
+        where: list[str] = []
+        params: list[object] = []
+        if brand_filter:
+            normalized = brand_filter.replace("-", " ").replace("_", " ").lower()
+            where.append("(lower(brand) = ? OR lower(source_project) = ?)")
+            params.extend([normalized, normalized])
+        if today_only:
+            where.append("date(imported_at) = date('now')")
+        if high_priority:
+            where.append("priority >= 8")
+        where_sql = f"WHERE {' AND '.join(where)}" if where else ""
         with self._connection() as conn:
             rows = conn.execute(
-                """
+                f"""
                 SELECT id, source_project, source_type, brand, title, summary, description, url, affiliate_url,
                        category, tags, priority, confidence, expiration, image_prompt, metadata, created_at
                 FROM signals
+                {where_sql}
                 ORDER BY imported_at DESC
                 LIMIT ?
                 """,
-                (limit,),
+                (*params, limit),
             ).fetchall()
         return [self._signal_from_row(row) for row in rows]
 
@@ -232,8 +262,8 @@ class ContentArchive:
                 cursor = conn.execute(
                     """
                     INSERT OR IGNORE INTO content_queue
-                    (date, signal_id, brand, platform, content_type, rank_score, scheduled_time, duplicate_risk)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    (date, signal_id, brand, platform, content_type, rank_score, scheduled_time, duplicate_risk, reason)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         item.date,
@@ -244,6 +274,7 @@ class ContentArchive:
                         item.rank_score,
                         item.scheduled_time,
                         item.duplicate_risk,
+                        item.reason,
                     ),
                 )
                 saved += cursor.rowcount
@@ -253,7 +284,7 @@ class ContentArchive:
         with self._connection() as conn:
             rows = conn.execute(
                 """
-                SELECT q.date, q.brand, q.platform, q.content_type, q.rank_score, q.scheduled_time, q.duplicate_risk,
+                SELECT q.date, q.brand, q.platform, q.content_type, q.rank_score, q.scheduled_time, q.duplicate_risk, q.reason,
                        s.id, s.source_project, s.source_type, s.brand, s.title, s.summary, s.description, s.url,
                        s.affiliate_url, s.category, s.tags, s.priority, s.confidence, s.expiration, s.image_prompt,
                        s.metadata, s.created_at
@@ -305,23 +336,23 @@ class ContentArchive:
     def _queue_from_row(self, row: tuple) -> QueuedContent:
         signal = Signal.from_dict(
             {
-                "id": row[7],
-                "source_project": row[8],
-                "source_type": row[9],
-                "brand": row[10],
-                "title": row[11],
-                "summary": row[12],
-                "description": row[13],
-                "url": row[14],
-                "affiliate_url": row[15],
-                "category": row[16],
-                "tags": json.loads(row[17]),
-                "priority": row[18],
-                "confidence": row[19],
-                "expiration": row[20],
-                "image_prompt": row[21],
-                "metadata": json.loads(row[22]),
-                "created_at": row[23],
+                "id": row[8],
+                "source_project": row[9],
+                "source_type": row[10],
+                "brand": row[11],
+                "title": row[12],
+                "summary": row[13],
+                "description": row[14],
+                "url": row[15],
+                "affiliate_url": row[16],
+                "category": row[17],
+                "tags": json.loads(row[18]),
+                "priority": row[19],
+                "confidence": row[20],
+                "expiration": row[21],
+                "image_prompt": row[22],
+                "metadata": json.loads(row[23]),
+                "created_at": row[24],
             }
         )
         return QueuedContent(
@@ -332,5 +363,12 @@ class ContentArchive:
             rank_score=row[4],
             scheduled_time=row[5],
             duplicate_risk=row[6],
+            reason=row[7] or self._default_queue_reason(signal, row[2], row[4], row[6]),
             signal=signal,
+        )
+
+    def _default_queue_reason(self, signal: Signal, platform: str, rank_score: int, duplicate_risk: str) -> str:
+        return (
+            f"priority {signal.priority}/10; confidence {round(signal.confidence * 100)}%; "
+            f"rank {rank_score}/100; {platform} fit; duplicate risk {duplicate_risk}"
         )

@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any
 
+from content_engine.signals.schema import validate_signal_payload
+
 
 @dataclass(frozen=True)
 class Deal:
@@ -178,41 +180,26 @@ class Signal:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Signal":
-        required = [
-            "id",
-            "source_project",
-            "source_type",
-            "brand",
-            "title",
-            "summary",
-            "description",
-            "url",
-            "category",
-            "priority",
-            "confidence",
-        ]
-        missing = [field for field in required if field not in data or data[field] in (None, "")]
-        if missing:
-            raise ValueError(f"Missing required signal fields: {', '.join(missing)}")
+        normalized = validate_signal_payload(data)
 
         return cls(
-            id=str(data["id"]),
-            source_project=str(data["source_project"]),
-            source_type=str(data["source_type"]),
-            brand=str(data["brand"]),
-            title=str(data["title"]),
-            summary=str(data["summary"]),
-            description=str(data["description"]),
-            url=str(data["url"]),
-            affiliate_url=str(data.get("affiliate_url", "")),
-            category=str(data["category"]),
-            tags=[str(tag) for tag in data.get("tags", [])],
-            priority=max(1, min(10, int(data["priority"]))),
-            confidence=max(0.0, min(1.0, float(data["confidence"]))),
-            expiration=str(data.get("expiration", "")),
-            image_prompt=str(data.get("image_prompt", "")),
-            metadata=dict(data.get("metadata", {})),
-            created_at=str(data.get("created_at", "")),
+            id=str(normalized["id"]),
+            source_project=str(normalized["source_project"]),
+            source_type=str(normalized["source_type"]),
+            brand=str(normalized["brand"]),
+            title=str(normalized["title"]),
+            summary=str(normalized["summary"]),
+            description=str(normalized["description"]),
+            url=str(normalized["url"]),
+            affiliate_url=str(normalized["affiliate_url"]),
+            category=str(normalized["category"]),
+            tags=[str(tag) for tag in normalized["tags"]],
+            priority=int(normalized["priority"]),
+            confidence=float(normalized["confidence"]),
+            expiration=str(normalized["expiration"]),
+            image_prompt=str(normalized["image_prompt"]),
+            metadata=dict(normalized["metadata"]),
+            created_at=str(normalized["created_at"]),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -247,6 +234,7 @@ class QueuedContent:
     rank_score: int
     scheduled_time: str
     duplicate_risk: str
+    reason: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -258,4 +246,5 @@ class QueuedContent:
             "rank_score": self.rank_score,
             "scheduled_time": self.scheduled_time,
             "duplicate_risk": self.duplicate_risk,
+            "reason": self.reason,
         }

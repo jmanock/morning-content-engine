@@ -2,7 +2,7 @@
 
 Private offline Python terminal app for turning project signals into a daily reviewable content queue.
 
-V3 makes the engine signal-driven. Any project can drop JSON into `signals/inbox/`, and the app will validate the signals, store them in SQLite, rank them, create a daily publishing queue, generate platform copy, and write reports for manual review. It does not auto-post.
+V4 makes the engine easier for other projects to feed. Any project can export JSON signals to an outbox, and this app can collect, validate, queue, and transform those signals into platform content for manual review. It does not auto-post.
 
 ## Setup
 
@@ -15,8 +15,12 @@ pip install -r requirements.txt
 ## Commands
 
 ```bash
+python main.py collect-signals
 python main.py import-signals
 python main.py signals
+python main.py signals florida-deals
+python main.py signals --today
+python main.py signals --high-priority
 python main.py queue
 python main.py morning
 python main.py report
@@ -38,23 +42,86 @@ python main.py clean
 
 ```mermaid
 flowchart TD
-    A["External projects and manual JSON"] --> B["signals/inbox"]
-    B --> C["Signal importer"]
-    C --> D["SQLite signals table"]
-    D --> E["Signal ranking"]
-    E --> F["Daily content queue"]
-    G["Brand YAML configs"] --> F
-    H["Signal templates"] --> I["Content generator"]
-    F --> I
-    I --> J["Quality scorer"]
-    J --> K["SQLite post archive"]
-    J --> L["Platform markdown reports"]
-    J --> M["preview.html dashboard"]
-    F --> N["publishing_schedule.md"]
-    K --> E
+    A["External project outboxes"] --> B["collect-signals"]
+    C["Manual create_signal.py"] --> D["signals/inbox"]
+    B --> D
+    D --> E["Signal importer"]
+    E --> F["Schema validation"]
+    F --> G["SQLite signals table"]
+    G --> H["Signal ranking"]
+    H --> I["Daily content queue + reasons"]
+    J["Brand YAML configs"] --> I
+    K["Signal templates"] --> L["Content generator"]
+    I --> L
+    L --> M["Quality scorer"]
+    M --> N["SQLite post archive"]
+    M --> O["Platform markdown reports"]
+    M --> P["preview.html dashboard"]
+    I --> Q["publishing_schedule.md"]
+    N --> H
 ```
 
-## Signal Intake
+## Signal Contract
+
+The formal contract is documented in:
+
+```text
+docs/SIGNAL_CONTRACT.md
+```
+
+Required fields:
+
+- `source_project`
+- `source_type`
+- `brand`
+- `title`
+- `summary`
+- `category`
+- `priority`
+- `confidence`
+
+`url` is recommended for publishable signals and must be a valid `http` or `https` URL when present. The validator also normalizes tags, metadata, `created_at`, and generated ids.
+
+## Manual Signal Creation
+
+Create a signal from the terminal:
+
+```bash
+python tools/create_signal.py \
+  --source-project florida-deals \
+  --source-type deal \
+  --brand "Florida Deals" \
+  --title "Orlando hotel deal under $150" \
+  --summary "Strong hotel deal for Florida travelers" \
+  --url "https://hoteldealsflorida.org" \
+  --category hotels \
+  --priority 8 \
+  --confidence 90
+```
+
+This writes a timestamped JSON file to:
+
+```text
+signals/inbox/
+```
+
+## Project Outbox Collection
+
+External projects should write JSON files to their own `signals/outbox/` folder. Configure enabled sources in:
+
+```text
+config/signal_sources.yaml
+```
+
+Then run:
+
+```bash
+python main.py collect-signals
+```
+
+Missing folders produce warnings and do not stop the run. Duplicate files are skipped.
+
+## Signal Intake Lifecycle
 
 Drop JSON files into:
 
@@ -69,6 +136,7 @@ python main.py import-signals
 ```
 
 Valid files move to `signals/processed/`. Invalid files move to `signals/archive/errors/`.
+Duplicate-only files move to `signals/archive/duplicates/`.
 
 Example signal files live in:
 
@@ -106,7 +174,7 @@ Run:
 python main.py queue
 ```
 
-The queue ranks recent signals by priority, confidence, expiration, brand fit, and duplicate history. It assigns signals to review platforms:
+The queue ranks recent signals by priority, confidence, expiration, brand schedule fit, platform fit, and recent duplicate history. Each queued item includes a reason explaining why it was selected. It assigns signals to review platforms:
 
 - Instagram
 - Facebook
@@ -160,6 +228,8 @@ Generated files include:
 - `posts.json`
 - `queue.json`
 
+`summary.md` includes signal intake counts, duplicate/error counts, sources used, and queue reasons. `preview.html` shows top signals, queued posts, source project, confidence, CTA, links, hashtags, quality scores, and queue reason.
+
 ## Templates
 
 Templates live in:
@@ -208,9 +278,17 @@ The archive tracks:
 
 Recently used signals are skipped or ranked lower so the daily queue does not repeat the same content.
 
+## Example Daily Workflow
+
+```bash
+python tools/create_signal.py --source-project florida-deals --source-type deal --brand "Florida Deals" --title "Orlando hotel deal under $150" --summary "Strong hotel deal for Florida travelers" --url "https://hoteldealsflorida.org" --category hotels --priority 8 --confidence 90
+python main.py collect-signals
+python main.py morning
+open reports/$(date +%F)/preview.html
+```
+
 ## Tests
 
 ```bash
 python -m unittest discover
 ```
-

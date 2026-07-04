@@ -1,0 +1,12 @@
+sources:
+  - name: florida_deals
+    path: "../florida-deals-network/signals/outbox"
+    enabled: false
+
+  - name: offer_radar
+    path: "../offer-radar/signals/outbox"
+    enabled: false
+
+  - name: bend_score
+    path: "../bend-score/signals/outbox"
+    enabled: false

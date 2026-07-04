@@ -48,6 +48,7 @@ def build_daily_queue(
             skipped_duplicates += 1
             continue
         platform = _platform_for(signal, brands.get(signal.brand), len(queue))
+        brand = brands.get(signal.brand)
         queue.append(
             QueuedContent(
                 date=queue_date.isoformat(),
@@ -58,6 +59,7 @@ def build_daily_queue(
                 rank_score=max(0, min(100, round(rank_score))),
                 scheduled_time=SCHEDULE_TIMES[len(queue) % len(SCHEDULE_TIMES)],
                 duplicate_risk=_duplicate_risk(signal, duplicate_keys),
+                reason=_queue_reason(signal, rank_score, platform, brand, duplicate_keys),
             )
         )
         seen_titles.add(normalized_title)
@@ -71,12 +73,16 @@ def _rank_signal(signal: Signal, duplicate_keys: set[str], brand: BrandProfile |
     score += _expiration_score(signal)
     if brand is not None:
         score += 8
+        if _brand_schedule_fit(signal, brand):
+            score += 5
         if signal.category.lower() in " ".join(brand.hashtags).lower():
             score += 4
     if signal.id in duplicate_keys:
         score -= 80
     if signal.url.strip().lower() in duplicate_keys:
         score -= 50
+    if signal.title.strip().lower() in duplicate_keys:
+        score -= 40
     return score
 
 
@@ -113,10 +119,37 @@ def _platform_for(signal: Signal, brand: BrandProfile | None, index: int) -> str
     return options[index % len(options)]
 
 
+def _brand_schedule_fit(signal: Signal, brand: BrandProfile) -> bool:
+    content_types = brand.posting_schedule.get("morning", {}).get("content_types", [])
+    expected = CONTENT_TYPE_BY_SOURCE.get(signal.source_type, "deal_post")
+    return not content_types or expected in content_types
+
+
 def _duplicate_risk(signal: Signal, duplicate_keys: set[str]) -> str:
     if signal.id in duplicate_keys:
         return "high"
     if signal.url.strip().lower() in duplicate_keys:
         return "medium"
+    if signal.title.strip().lower() in duplicate_keys:
+        return "medium"
     return "low"
 
+
+def _queue_reason(signal: Signal, rank_score: float, platform: str, brand: BrandProfile | None, duplicate_keys: set[str]) -> str:
+    parts = [
+        f"priority {signal.priority}/10",
+        f"confidence {round(signal.confidence * 100)}%",
+        f"rank {max(0, min(100, round(rank_score)))}/100",
+    ]
+    expiration = _expiration_score(signal)
+    if expiration >= 12:
+        parts.append("expires soon")
+    if brand is not None:
+        parts.append("brand match")
+        if platform in set(brand.social_platforms) | {"blog"}:
+            parts.append(f"{platform} fit")
+        if _brand_schedule_fit(signal, brand):
+            parts.append("schedule fit")
+    if _duplicate_risk(signal, duplicate_keys) == "low":
+        parts.append("unused recently")
+    return "; ".join(parts)

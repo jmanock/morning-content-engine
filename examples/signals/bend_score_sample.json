@@ -12,7 +12,7 @@
     "category": "business",
     "tags": ["local business", "retail", "opportunity"],
     "priority": 8,
-    "confidence": 0.84,
+    "confidence": 84,
     "expiration": "2026-07-20",
     "image_prompt": "Downtown retail street with data overlay, professional local business analytics style",
     "metadata": {"market": "Bend", "score_delta": 12}
@@ -30,7 +30,7 @@
     "category": "business",
     "tags": ["traffic", "service business", "market signal"],
     "priority": 7,
-    "confidence": 0.8,
+    "confidence": 80,
     "expiration": "2026-07-18",
     "image_prompt": "Map dashboard showing local traffic activity, restrained business intelligence look",
     "metadata": {"signal_strength": "medium"}

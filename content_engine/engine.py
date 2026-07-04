@@ -8,7 +8,7 @@ from pathlib import Path
 from content_engine.archive.store import ContentArchive
 from content_engine.config.brands import load_brands
 from content_engine.platform.pipeline import create_queue, run_morning
-from content_engine.signals.importer import import_signals_from_inbox
+from content_engine.signals.importer import collect_signals_from_sources, import_signals_from_inbox
 from content_engine.ranking.scorer import rank_deals, select_top_deals
 from content_engine.rendering.images import create_image_prompts, create_placeholder_images
 from content_engine.reports.writer import (
@@ -120,8 +120,22 @@ def import_signal_lines() -> list[str]:
     return import_signals_from_inbox().lines()
 
 
-def signal_lines(limit: int = 20) -> list[str]:
-    signals = ContentArchive().recent_signals(limit=limit)
+def collect_signal_lines() -> list[str]:
+    return collect_signals_from_sources().lines()
+
+
+def signal_lines(
+    brand_filter: str | None = None,
+    today_only: bool = False,
+    high_priority: bool = False,
+    limit: int = 20,
+) -> list[str]:
+    signals = ContentArchive().recent_signals(
+        limit=limit,
+        brand_filter=brand_filter,
+        today_only=today_only,
+        high_priority=high_priority,
+    )
     if not signals:
         return ["No signals imported yet."]
     return [
@@ -136,7 +150,7 @@ def queue_lines() -> list[str]:
         return [f"No queued content. Skipped duplicates: {skipped}."]
     lines = [f"Queued items: {len(queue)}", f"Skipped duplicates: {skipped}"]
     lines.extend(
-        f"{item.scheduled_time} | {item.platform} | {item.brand} | {item.rank_score}/100 | {item.signal.title}"
+        f"{item.scheduled_time} | {item.platform} | {item.brand} | {item.rank_score}/100 | {item.signal.title} | {item.reason}"
         for item in queue
     )
     return lines

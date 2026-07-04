@@ -12,7 +12,7 @@
     "category": "flight",
     "tags": ["flights", "orlando", "boston", "travel"],
     "priority": 9,
-    "confidence": 0.91,
+    "confidence": 91,
     "expiration": "2026-07-06",
     "image_prompt": "Orlando airport gate with Boston destination board, clean sunny travel deal style",
     "metadata": {"price": 138, "original_price": 289}
@@ -30,7 +30,7 @@
     "category": "hotel",
     "tags": ["hotel", "sarasota", "beach", "weekend"],
     "priority": 8,
-    "confidence": 0.87,
+    "confidence": 87,
     "expiration": "2026-07-08",
     "image_prompt": "Sarasota beach hotel balcony in morning light, approachable social travel graphic",
     "metadata": {"price": 129, "savings_percent": 42}
@@ -48,7 +48,7 @@
     "category": "local",
     "tags": ["tampa", "family", "local", "weekend"],
     "priority": 6,
-    "confidence": 0.79,
+    "confidence": 79,
     "expiration": "2026-07-05",
     "image_prompt": "Family-friendly Tampa museum scene with bright educational displays",
     "metadata": {"audience": "families"}
